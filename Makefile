@@ -4,7 +4,7 @@ test:
 
 .PHONY: bin
 bin: fmt vet
-	go build -o bin/kubectl-ai
+	go build -o bin/application-ai
 
 .PHONY: fmt
 fmt:

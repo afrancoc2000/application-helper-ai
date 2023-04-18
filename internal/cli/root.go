@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
@@ -18,7 +19,7 @@ const (
 	version = "0.0.7"
 
 	apply      = "Apply"
-	dontApply  = "Don't apply"
+	doNotApply = "Don't apply"
 	makeBetter = "Add to the query"
 )
 
@@ -34,20 +35,32 @@ var (
 	chatContext          = flag.String("openai-chat-context", env.GetOr("OPENAI_CHAT_CONTEXT", env.String, ""), "The text context for the OpenAI service to know what kind of app to generate.")
 )
 
-func InitAndExecute() {
+type Command struct {
+	client      AIClient
+	fileFactory FileFactory
+}
+
+func NewCommand() (*Command, error) {
 	flag.Parse()
 
 	if *openAIAPIKey == "" {
-		fmt.Println("Please provide an OpenAI key.")
-		os.Exit(1)
+		return nil, fmt.Errorf("Please provide an OpenAI key.")
 	}
 
-	if err := RootCmd().Execute(); err != nil {
-		os.Exit(1)
+	client, err := newAIClient()
+	if err != nil {
+		return nil, err
 	}
+
+	fileFactory := fileFactory{}
+
+	return &Command{
+		client:      client,
+		fileFactory: &fileFactory,
+	}, nil
 }
 
-func RootCmd() *cobra.Command {
+func (c *Command) CreateCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "application-ai",
 		Version:      version,
@@ -57,7 +70,7 @@ func RootCmd() *cobra.Command {
 				return fmt.Errorf("prompt must be provided")
 			}
 
-			err := run(args)
+			err := c.run(args)
 			if err != nil {
 				return err
 			}
@@ -73,19 +86,18 @@ func RootCmd() *cobra.Command {
 	return cmd
 }
 
-func run(args []string) error {
+func (c *Command) run(args []string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	client, err := newAIClient()
-	if err != nil {
-		return err
-	}
-
 	var action, queryResult string
+	var err error
 	for action != apply {
+		fmt.Println("Action: " + action)
+
 		args = append(args, action)
-		queryResult, err = client.queryOpenAI(ctx, args, *openAIDeploymentName)
+		fmt.Println("Args: " + strings.Join(args[:], ","))
+		queryResult, err = c.client.queryOpenAI(ctx, args, *openAIDeploymentName)
 		if err != nil {
 			return err
 		}
@@ -95,19 +107,19 @@ func run(args []string) error {
 			queryResult)
 		fmt.Println(text)
 
-		action, err := userActionPrompt()
+		action, err = c.userActionPrompt()
 		if err != nil {
 			return err
 		}
 
-		if action == dontApply {
+		if action == doNotApply {
 			return nil
 		}
 	}
-	return applyManifest(queryResult)
+	return c.fileFactory.BuildProject(queryResult)
 }
 
-func userActionPrompt() (string, error) {
+func (c *Command) userActionPrompt() (string, error) {
 	// if require confirmation is not set, immediately return apply
 	if !*requireConfirmation {
 		return apply, nil
@@ -115,8 +127,8 @@ func userActionPrompt() (string, error) {
 
 	var result string
 	var err error
-	items := []string{apply, dontApply}
-	label := fmt.Sprintf("Would you like to apply this? [%s/%s/%s]", makeBetter, apply, dontApply)
+	items := []string{apply, doNotApply}
+	label := fmt.Sprintf("Would you like to apply this? [%s/%s/%s]", makeBetter, apply, doNotApply)
 
 	prompt := promptui.SelectWithAdd{
 		Label:    label,
@@ -125,8 +137,9 @@ func userActionPrompt() (string, error) {
 	}
 	_, result, err = prompt.Run()
 	if err != nil {
-		return dontApply, err
+		return doNotApply, err
 	}
+	fmt.Println("prompt result: " + result)
 
 	return result, nil
 }
