@@ -13,3 +13,5 @@
 
 bin/
 /vendor
+/.vscode/launch.json
+/scripts
