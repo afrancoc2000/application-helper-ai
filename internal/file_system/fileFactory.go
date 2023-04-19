@@ -77,9 +77,9 @@ func (f *fileFactory) generateFiles(instructions []string) []factoryFile {
 		}
 	}
 
-	fmt.Printf("Files: %v", len(files))		
+	fmt.Printf("Files: %v", len(files))
 	for _, file := range files {
-		fmt.Printf("{name: %s, path: %s, content: %v}\n", file.name, file.path, len(file.content))		
+		fmt.Printf("{name: %s, path: %s, content: %v}\n", file.name, file.path, len(file.content))
 	}
 
 	return files
