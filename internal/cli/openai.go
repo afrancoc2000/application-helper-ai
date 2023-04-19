@@ -7,24 +7,24 @@ import (
 	"regexp"
 	"strings"
 
-	openai "github.com/PullRequestInc/go-gpt3"
+	openAI "github.com/PullRequestInc/go-gpt3"
 	gptEncoder "github.com/samber/go-gpt-3-encoder"
-	azureopenai "github.com/sozercan/kubectl-ai/pkg/gpt3"
+	azureOpenAI "github.com/sozercan/kubectl-ai/pkg/gpt3"
 )
 
 const (
 	userRole        = "user"
 	numberOfChoices = 1
-	baseContext     = "You are a coding assistant for developers, you help developers create applications, you specify one by one the files needed to build an application telling the file name, the file path and the file content. you don't give explanations you don't show the commands needed to run"
+	baseContext     = "You are a coding assistant for developers, you help developers create applications, you specify one by one the files needed to build an application telling the file name, the file path and the file content. You specify the file path as a relative path. You don't give explanations you don't show the commands needed to run"
 )
 
 type AIClient interface {
 	queryOpenAI(ctx context.Context, prompts []string, deploymentName string) (string, error)
 }
 
-func newAIClient() (AIClient, error) {
+func NewAIClient() (AIClient, error) {
 	if azureOpenAIEndpoint == nil || *azureOpenAIEndpoint == "" {
-		client := openai.NewClient(*openAIAPIKey)
+		client := openAI.NewClient(*openAIAPIKey)
 		if isChat() {
 			return &openAIChatClient{client: client}, nil
 		} else {
@@ -37,7 +37,7 @@ func newAIClient() (AIClient, error) {
 			return nil, err
 		}
 
-		client, err := azureopenai.NewClient(*azureOpenAIEndpoint, *openAIAPIKey, *openAIDeploymentName)
+		client, err := azureOpenAI.NewClient(*azureOpenAIEndpoint, *openAIAPIKey, *openAIDeploymentName)
 		if err != nil {
 			return nil, err
 		}
@@ -58,19 +58,19 @@ func isChat() bool {
 }
 
 type openAICompletionClient struct {
-	client openai.Client
+	client openAI.Client
 }
 
 type openAIChatClient struct {
-	client openai.Client
+	client openAI.Client
 }
 
 type azureAICompletionClient struct {
-	client azureopenai.Client
+	client azureOpenAI.Client
 }
 
 type azureAIChatClient struct {
-	client azureopenai.Client
+	client azureOpenAI.Client
 }
 
 func calculateParams(prompts []string, deploymentName string) (*float32, *int, *int, *strings.Builder, error) {
@@ -97,7 +97,7 @@ func (c *openAICompletionClient) queryOpenAI(ctx context.Context, prompts []stri
 		return "", err
 	}
 
-	resp, err := c.client.CompletionWithEngine(ctx, *openAIDeploymentName, openai.CompletionRequest{
+	resp, err := c.client.CompletionWithEngine(ctx, *openAIDeploymentName, openAI.CompletionRequest{
 		Prompt:      []string{prompt.String()},
 		MaxTokens:   maxTokens,
 		Echo:        false,
@@ -121,9 +121,9 @@ func (c *openAIChatClient) queryOpenAI(ctx context.Context, prompts []string, de
 		return "", err
 	}
 
-	resp, err := c.client.ChatCompletion(ctx, openai.ChatCompletionRequest{
+	resp, err := c.client.ChatCompletion(ctx, openAI.ChatCompletionRequest{
 		Model: *openAIDeploymentName,
-		Messages: []openai.ChatCompletionRequestMessage{
+		Messages: []openAI.ChatCompletionRequestMessage{
 			{
 				Role:    userRole,
 				Content: prompt.String(),
@@ -150,7 +150,7 @@ func (c *azureAICompletionClient) queryOpenAI(ctx context.Context, prompts []str
 		return "", err
 	}
 
-	resp, err := c.client.Completion(ctx, azureopenai.CompletionRequest{
+	resp, err := c.client.Completion(ctx, azureOpenAI.CompletionRequest{
 		Prompt:      []string{prompt.String()},
 		MaxTokens:   maxTokens,
 		Echo:        false,
@@ -174,9 +174,9 @@ func (c *azureAIChatClient) queryOpenAI(ctx context.Context, prompts []string, d
 		return "", err
 	}
 
-	resp, err := c.client.ChatCompletion(ctx, azureopenai.ChatCompletionRequest{
+	resp, err := c.client.ChatCompletion(ctx, azureOpenAI.ChatCompletionRequest{
 		Model: *openAIDeploymentName,
-		Messages: []azureopenai.ChatCompletionRequestMessage{
+		Messages: []azureOpenAI.ChatCompletionRequestMessage{
 			{
 				Role:    userRole,
 				Content: prompt.String(),

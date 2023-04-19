@@ -7,12 +7,11 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"github.com/walles/env"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	genericCliOptions "k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 const (
@@ -24,7 +23,7 @@ const (
 )
 
 var (
-	kubernetesConfigFlags *genericclioptions.ConfigFlags
+	kubernetesConfigFlags *genericCliOptions.ConfigFlags
 
 	openAIDeploymentName = flag.String("openai-deployment-name", env.GetOr("OPENAI_DEPLOYMENT_NAME", env.String, "text-davinci-003"), "The deployment name used for the model in OpenAI service.")
 	maxTokens            = flag.Int("max-tokens", env.GetOr("MAX_TOKENS", strconv.Atoi, 0), "The max token will overwrite the max tokens in the max tokens map.")
@@ -47,12 +46,12 @@ func NewCommand() (*Command, error) {
 		return nil, fmt.Errorf("Please provide an OpenAI key.")
 	}
 
-	client, err := newAIClient()
+	client, err := NewAIClient()
 	if err != nil {
 		return nil, err
 	}
 
-	fileFactory := fileFactory{}
+	fileFactory := NewFileFactory()
 
 	return &Command{
 		client:      client,
@@ -79,7 +78,7 @@ func (c *Command) CreateCommand() *cobra.Command {
 		},
 	}
 
-	kubernetesConfigFlags = genericclioptions.NewConfigFlags(false)
+	kubernetesConfigFlags = genericCliOptions.NewConfigFlags(false)
 	kubernetesConfigFlags.AddFlags(cmd.Flags())
 	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 
@@ -93,10 +92,8 @@ func (c *Command) run(args []string) error {
 	var action, queryResult string
 	var err error
 	for action != apply {
-		fmt.Println("Action: " + action)
 
 		args = append(args, action)
-		fmt.Println("Args: " + strings.Join(args[:], ","))
 		queryResult, err = c.client.queryOpenAI(ctx, args, *openAIDeploymentName)
 		if err != nil {
 			return err
@@ -139,7 +136,6 @@ func (c *Command) userActionPrompt() (string, error) {
 	if err != nil {
 		return doNotApply, err
 	}
-	fmt.Println("prompt result: " + result)
 
 	return result, nil
 }

@@ -21,6 +21,10 @@ type FileFactory interface {
 type fileFactory struct {
 }
 
+func NewFileFactory() fileFactory {
+	return fileFactory{}
+}
+
 type factoryFile struct {
 	name    string
 	path    string
@@ -48,50 +52,57 @@ func (f *fileFactory) generateFiles(instructions []string) []factoryFile {
 
 	var currentFile factoryFile
 	for _, instruction := range instructions {
-		if openContent {
-			currentFile.content = currentFile.content + instruction
-		}
 
 		if strings.Contains(instruction, fileQuotesLabel) {
 			openContent = !openContent
+			if !openContent {
+				files = append(files, currentFile)
+			}
 			continue
-		}
 
-		if strings.Contains(instruction, filePathLabel) {
+		} else if openContent {
+			currentFile.content = currentFile.content + "\n" + instruction
+			continue
+
+		} else if strings.Contains(instruction, filePathLabel) {
 			re := regexp.MustCompile(filePathLabel + `\s+(\S+)`)
 			currentFile.path = re.FindStringSubmatch(instruction)[1]
 			continue
-		}
-		
-		if strings.Contains(instruction, fileNameLabel) {
-			currentFile := new(factoryFile)
+
+		} else if strings.Contains(instruction, fileNameLabel) {
+			currentFile = factoryFile{}
 			re := regexp.MustCompile(fileNameLabel + `\s+(\S+)`)
 			currentFile.name = re.FindStringSubmatch(instruction)[1]
-			files = append(files, *currentFile)
 			continue
 		}
 	}
+
+	fmt.Printf("Files: %v", len(files))		
+	for _, file := range files {
+		fmt.Printf("{name: %s, path: %s, content: %v}\n", file.name, file.path, len(file.content))		
+	}
+
 	return files
 }
 
 func (f *fileFactory) saveFile(factoryFile factoryFile) error {
 	err := os.MkdirAll(factoryFile.path, os.ModePerm)
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 
-	file, err := os.Create(fmt.Sprintf(".%s%s", factoryFile.path, factoryFile.name))
-    if err != nil {
-        fmt.Println(err)
-        return err
-    }
-    defer file.Close()
+	file, err := os.Create(fmt.Sprintf("%s%s", factoryFile.path, factoryFile.name))
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	defer file.Close()
 
-    _, err = file.WriteString(factoryFile.content)
-    if err != nil {
-        fmt.Println(err)
-        return err
-    }
+	_, err = file.WriteString(factoryFile.content)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
 
 	return nil
 }
