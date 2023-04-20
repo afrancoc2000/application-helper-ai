@@ -32,10 +32,6 @@ type Command struct {
 func NewCommand(appConfig config.AppConfig) (*Command, error) {
 	flag.Parse()
 
-	if appConfig.OpenAIAPIKey == "" {
-		return nil, fmt.Errorf("Please provide an OpenAI key.")
-	}
-
 	client, err := openai.NewAIClient(appConfig)
 	if err != nil {
 		return nil, err
@@ -87,10 +83,7 @@ func (c *Command) run(args []string) error {
 			return err
 		}
 
-		text := fmt.Sprintf(
-			"These are the files that would be created. Do you want to apply them? or add something to the query?\n%s",
-			queryResult)
-		files, err = models.AppFileFromString(text)
+		files, err = models.AppFileFromString(queryResult)
 		if err != nil {
 			return err
 		}
@@ -135,6 +128,7 @@ func (c *Command) userActionPrompt() (string, error) {
 }
 
 func printQueryResults(files []models.AppFile) {
+	fmt.Println("These are the files that would be created. Do you want to apply them? or add something to the query?")
 	for index, file := range files {
 		fmt.Printf("%d. File: %s/%s:\n", index, file.Path, file.Name)
 		fmt.Printf("%s\n", file.Content)

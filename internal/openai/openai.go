@@ -15,11 +15,24 @@ import (
 )
 
 const (
-	numberOfChoices = 1
-	reservedTokens  = 200
-	baseContext     = "You are a coding assistant for developers, you help developers create applications, you specify one by one the files needed to build an application telling the file name, the file path and the file content. You specify the file path as a valid relative path starting with a point '.'. You must return the answer as a json array, the user is a computer that needs to be able to parse your answer. You don't give explanations you don't show the commands needed to run."
-	examplePrompt   = "Create a terraform project for a resource group"
-	exampleAnswer   = `[{"fileName":"main.tf","filePath":"./","fileContent":"# Configure the Azure provider\nprovider \"azurerm\" {\n  features {}\n}\n\n# Create a resource group\nresource \"azurerm_resource_group\" \"aks\" {\n  name     = var.resource_group_name\n  location = var.resource_group_location\n}\n"}]`
+	numberOfChoices      = 1
+	reservedTokens       = 200
+	baseContext          = "You are a coding assistant for developers, you help developers create applications, you specify one by one the files needed to build an application telling the file name, the file path and the file content. You specify the file path as a valid relative path starting with a point '.'. You must return the answer as a json array, the user is a computer that needs to be able to parse your answer. You don't give explanations you don't show the commands needed to run."
+	examplePrompt        = "Create a terraform project for a resource group"
+	exampleAnswerName    = "main.tf"
+	exampleAnswerPath    = "./"
+	exampleAnswerContent = `
+	# Configure the Azure provider  
+	provider "azurerm" {  
+		features {}  
+	}  
+	  
+	# Create a resource group  
+	resource "azurerm_resource_group" "aks" {  
+		name     = var.resource_group_name  
+		location = var.resource_group_location  
+	}  		
+	`
 )
 
 type AIClient interface {
@@ -52,7 +65,8 @@ func NewAIClient(appConfig config.AppConfig) (AIClient, error) {
 			messages := initializeMessages()
 			return &azureAIChatClient{client: client, appConfig: appConfig, messages: messages}, nil
 		} else {
-			return &azureAICompletionClient{client: client, appConfig: appConfig}, nil
+			prompts := initializePrompts()
+			return &azureAICompletionClient{client: client, appConfig: appConfig, prompts: prompts}, nil
 		}
 	}
 }
@@ -90,22 +104,15 @@ type azureAIChatClient struct {
 }
 
 func calculateCompletionParams(prompts []string, appConfig config.AppConfig) (*int, error) {
-	maxTokens, err := calculateMaxTokens(strings.Join(prompts, "\n"), appConfig.OpenAIDeployment, appConfig.MaxTokens)
-	if err != nil {
-		return nil, err
-	}
-
-	return maxTokens, err
+	return calculateMaxTokens(strings.Join(prompts, "\n"), appConfig.OpenAIDeployment, appConfig.MaxTokens)
 }
 
 func calculateChatParams(messages []models.Message, appConfig config.AppConfig) (*int, error) {
 	prompts, err := json.Marshal(messages)
-	maxTokens, err := calculateMaxTokens(string(prompts), appConfig.OpenAIDeployment, appConfig.MaxTokens)
 	if err != nil {
 		return nil, err
 	}
-
-	return maxTokens, err
+	return calculateMaxTokens(string(prompts), appConfig.OpenAIDeployment, appConfig.MaxTokens)
 }
 
 func (c *openAICompletionClient) QueryOpenAI(ctx context.Context, prompt string) (string, error) {
@@ -258,9 +265,16 @@ func initializeMessages() []models.Message {
 	}
 	messages = append(messages, examplePromptMessage)
 
+	exampleAnswer := models.AppFile{
+		Name:    exampleAnswerName,
+		Path:    exampleAnswerPath,
+		Content: exampleAnswerContent,
+	}
+	jsonContent, _ := json.Marshal(exampleAnswer)
+
 	exampleAnswerMessage := models.Message{
 		Role:    models.Assistant,
-		Content: exampleAnswer,
+		Content: string(jsonContent),
 	}
 	messages = append(messages, exampleAnswerMessage)
 
