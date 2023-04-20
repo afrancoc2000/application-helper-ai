@@ -2,12 +2,14 @@ package openai
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	openAI "github.com/PullRequestInc/go-gpt3"
 	"github.com/afrancoc2000/application-helper-ai/internal/config"
+	"github.com/afrancoc2000/application-helper-ai/internal/models"
 	gptEncoder "github.com/samber/go-gpt-3-encoder"
 	azureOpenAI "github.com/sozercan/kubectl-ai/pkg/gpt3"
 )
@@ -16,19 +18,16 @@ const (
 	numberOfChoices = 1
 	reservedTokens  = 200
 	baseContext     = "You are a coding assistant for developers, you help developers create applications, you specify one by one the files needed to build an application telling the file name, the file path and the file content. You specify the file path as a valid relative path starting with a point '.'. You must return the answer as a json array, the user is a computer that needs to be able to parse your answer. You don't give explanations you don't show the commands needed to run."
+	examplePrompt   = "Create a terraform project for a resource group"
+	exampleAnswer   = `[{"fileName":"main.tf","filePath":"./","fileContent":"# Configure the Azure provider\nprovider \"azurerm\" {\n  features {}\n}\n\n# Create a resource group\nresource \"azurerm_resource_group\" \"aks\" {\n  name     = var.resource_group_name\n  location = var.resource_group_location\n}\n"}]`
 )
 
 type AIClient interface {
-	QueryOpenAI(ctx context.Context, prompts []string, deploymentName string) (string, error)
-}
-
-type Message struct {
-	role    Role
-	content string
+	QueryOpenAI(ctx context.Context, prompt string) (string, error)
 }
 
 func NewAIClient(appConfig config.AppConfig) (AIClient, error) {
-	isChat := isChat(appConfig.OpenAIDeploymentName)
+	isChat := isChat(appConfig.OpenAIDeployment)
 	isOpenAI := isOpenAI(appConfig.AzureOpenAIEndpoint)
 	if isOpenAI {
 		client := openAI.NewClient(appConfig.OpenAIAPIKey)
@@ -36,13 +35,14 @@ func NewAIClient(appConfig config.AppConfig) (AIClient, error) {
 			messages := initializeMessages()
 			return &openAIChatClient{client: client, appConfig: appConfig, messages: messages}, nil
 		} else {
-			return &openAICompletionClient{client: client, appConfig: appConfig}, nil
+			prompts := initializePrompts()
+			return &openAICompletionClient{client: client, appConfig: appConfig, prompts: prompts}, nil
 		}
 	} else {
 		client, err := azureOpenAI.NewClient(
 			appConfig.AzureOpenAIEndpoint,
 			appConfig.OpenAIAPIKey,
-			appConfig.OpenAIDeploymentName,
+			appConfig.OpenAIDeployment.String(),
 			azureOpenAI.WithTimeout(60*time.Second))
 		if err != nil {
 			return nil, err
@@ -57,11 +57,8 @@ func NewAIClient(appConfig config.AppConfig) (AIClient, error) {
 	}
 }
 
-func isChat(deployment string) bool {
-	return deployment == "gpt-3.5-turbo-0301" ||
-		deployment == "gpt-3.5-turbo" ||
-		deployment == "gpt-4-0314" ||
-		deployment == "gpt-4-32k-0314"
+func isChat(deployment models.Deployment) bool {
+	return deployment.IsChat()
 }
 
 func isOpenAI(endpoint string) bool {
@@ -71,66 +68,58 @@ func isOpenAI(endpoint string) bool {
 type openAICompletionClient struct {
 	client    openAI.Client
 	appConfig config.AppConfig
+	prompts   []string
 }
 
 type openAIChatClient struct {
 	client    openAI.Client
 	appConfig config.AppConfig
-	messages  []Message
+	messages  []models.Message
 }
 
 type azureAICompletionClient struct {
 	client    azureOpenAI.Client
 	appConfig config.AppConfig
+	prompts   []string
 }
 
 type azureAIChatClient struct {
 	client    azureOpenAI.Client
 	appConfig config.AppConfig
-	messages  []Message
+	messages  []models.Message
 }
 
-func calculateCompletionParams(prompts []string, appConfig config.AppConfig) (*int, *int, *strings.Builder, error) {
-	choices := int(numberOfChoices)
-	maxTokens, err := calculateMaxTokens(strings.Join(prompts, "\n"), appConfig.OpenAIDeploymentName, appConfig.MaxTokens)
+func calculateCompletionParams(prompts []string, appConfig config.AppConfig) (*int, error) {
+	maxTokens, err := calculateMaxTokens(strings.Join(prompts, "\n"), appConfig.OpenAIDeployment, appConfig.MaxTokens)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
-	var prompt strings.Builder
-	for _, p := range prompts {
-		fmt.Fprintf(&prompt, "%s\n", p)
-	}
-
-	return &choices, maxTokens, &prompt, err
+	return maxTokens, err
 }
 
-func calculateChatParams(messages []Message, appConfig config.AppConfig) (*int, *int, *strings.Builder, error) {
-	choices := int(numberOfChoices)
-	maxTokens, err := calculateMaxTokens(strings.Join(prompts, "\n"), appConfig.OpenAIDeploymentName, appConfig.MaxTokens)
+func calculateChatParams(messages []models.Message, appConfig config.AppConfig) (*int, error) {
+	prompts, err := json.Marshal(messages)
+	maxTokens, err := calculateMaxTokens(string(prompts), appConfig.OpenAIDeployment, appConfig.MaxTokens)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
-	var prompt strings.Builder
-	for _, p := range prompts {
-		fmt.Fprintf(&prompt, "%s\n", p)
-	}
-
-	return &choices, maxTokens, &prompt, err
+	return maxTokens, err
 }
 
-func (c *openAICompletionClient) QueryOpenAI(ctx context.Context, prompts []string, deploymentName string) (string, error) {
-	choices, maxTokens, prompt, err := calculateCompletionParams(prompts, c.appConfig)
+func (c *openAICompletionClient) QueryOpenAI(ctx context.Context, prompt string) (string, error) {
+	c.prompts = append(c.prompts, prompt)
+	maxTokens, err := calculateCompletionParams(c.prompts, c.appConfig)
 	if err != nil {
 		return "", err
 	}
 
-	resp, err := c.client.CompletionWithEngine(ctx, c.appConfig.OpenAIDeploymentName, openAI.CompletionRequest{
-		Prompt:      []string{prompt.String()},
+	resp, err := c.client.CompletionWithEngine(ctx, c.appConfig.OpenAIDeployment.String(), openAI.CompletionRequest{
+		Prompt:      c.prompts,
 		MaxTokens:   maxTokens,
 		Echo:        false,
-		N:           choices,
+		N:           &c.appConfig.Choices,
 		Temperature: &c.appConfig.Temperature,
 	})
 	if err != nil {
@@ -144,22 +133,22 @@ func (c *openAICompletionClient) QueryOpenAI(ctx context.Context, prompts []stri
 	return resp.Choices[0].Text, nil
 }
 
-func (c *openAIChatClient) QueryOpenAI(ctx context.Context, prompts []string, deploymentName string) (string, error) {
-	choices, maxTokens, prompt, err := calculateCompletionParams(prompts, c.appConfig)
+func (c *openAIChatClient) QueryOpenAI(ctx context.Context, prompt string) (string, error) {
+	message := models.Message{
+		Role:    models.User,
+		Content: prompt,
+	}
+	c.messages = append(c.messages, message)
+	maxTokens, err := calculateChatParams(c.messages, c.appConfig)
 	if err != nil {
 		return "", err
 	}
 
 	resp, err := c.client.ChatCompletion(ctx, openAI.ChatCompletionRequest{
-		Model: c.appConfig.OpenAIDeploymentName,
-		Messages: []openAI.ChatCompletionRequestMessage{
-			{
-				Role:    userRole,
-				Content: prompt.String(),
-			},
-		},
+		Model:       c.appConfig.OpenAIDeployment.String(),
+		Messages:    models.ConvertToOpenAIMessages(c.messages),
 		MaxTokens:   *maxTokens,
-		N:           *choices,
+		N:           *&c.appConfig.Choices,
 		Temperature: &c.appConfig.Temperature,
 	})
 	if err != nil {
@@ -170,20 +159,27 @@ func (c *openAIChatClient) QueryOpenAI(ctx context.Context, prompts []string, de
 		return "", fmt.Errorf("expected choices to be 1 but received: %d", len(resp.Choices))
 	}
 
+	message = models.Message{
+		Role:    models.Assistant,
+		Content: resp.Choices[0].Message.Content,
+	}
+	c.messages = append(c.messages, message)
+
 	return resp.Choices[0].Message.Content, nil
 }
 
-func (c *azureAICompletionClient) QueryOpenAI(ctx context.Context, prompts []string, deploymentName string) (string, error) {
-	choices, maxTokens, prompt, err := calculateCompletionParams(prompts, c.appConfig)
+func (c *azureAICompletionClient) QueryOpenAI(ctx context.Context, prompt string) (string, error) {
+	c.prompts = append(c.prompts, prompt)
+	maxTokens, err := calculateCompletionParams(c.prompts, c.appConfig)
 	if err != nil {
 		return "", err
 	}
 
 	resp, err := c.client.Completion(ctx, azureOpenAI.CompletionRequest{
-		Prompt:      []string{prompt.String()},
+		Prompt:      c.prompts,
 		MaxTokens:   maxTokens,
 		Echo:        false,
-		N:           choices,
+		N:           &c.appConfig.Choices,
 		Temperature: &c.appConfig.Temperature,
 	})
 	if err != nil {
@@ -197,26 +193,22 @@ func (c *azureAICompletionClient) QueryOpenAI(ctx context.Context, prompts []str
 	return resp.Choices[0].Text, nil
 }
 
-func (c *azureAIChatClient) QueryOpenAI(ctx context.Context, prompts []string, deploymentName string) (string, error) {
-	choices, maxTokens, prompt, err := calculateCompletionParams(prompts, c.appConfig)
+func (c *azureAIChatClient) QueryOpenAI(ctx context.Context, prompt string) (string, error) {
+	message := models.Message{
+		Role:    models.User,
+		Content: prompt,
+	}
+	c.messages = append(c.messages, message)
+	maxTokens, err := calculateChatParams(c.messages, c.appConfig)
 	if err != nil {
 		return "", err
 	}
 
 	resp, err := c.client.ChatCompletion(ctx, azureOpenAI.ChatCompletionRequest{
-		Model: c.appConfig.OpenAIDeploymentName,
-		Messages: []azureOpenAI.ChatCompletionRequestMessage{
-			{
-				Role:    "system",
-				Content: fmt.Sprintf("%s\n%s\n", baseContext, c.appConfig.ChatContext),
-			},
-			{
-				Role:    userRole,
-				Content: prompt.String(),
-			},
-		},
+		Model:       c.appConfig.OpenAIDeployment.String(),
+		Messages:    models.ConvertToAzureOpenAIMessages(c.messages),
 		MaxTokens:   *maxTokens,
-		N:           *choices,
+		N:           *&c.appConfig.Choices,
 		Temperature: &c.appConfig.Temperature,
 	})
 	if err != nil {
@@ -230,24 +222,10 @@ func (c *azureAIChatClient) QueryOpenAI(ctx context.Context, prompts []string, d
 	return resp.Choices[0].Message.Content, nil
 }
 
-var maxTokensMap = map[string]int{
-	"code-davinci-002":   8001,
-	"text-davinci-003":   4097,
-	"gpt-3.5-turbo-0301": 4096,
-	"gpt-3.5-turbo":      4096,
-	"gpt-35-turbo-0301":  4096, // for azure
-	"gpt-4-0314":         8192,
-	"gpt-4-32k-0314":     8192,
-}
-
-func calculateMaxTokens(prompt string, deploymentName string, userMaxTokens int) (*int, error) {
+func calculateMaxTokens(prompt string, deployment models.Deployment, userMaxTokens int) (*int, error) {
 	maxTokens := userMaxTokens
 	if maxTokens == 0 {
-		var ok bool
-		maxTokens, ok = maxTokensMap[deploymentName]
-		if !ok {
-			return nil, fmt.Errorf("deploymentName %q not found in max tokens map", deploymentName)
-		}
+		maxTokens = deployment.MaxTokens()
 	}
 
 	encoder, err := gptEncoder.NewEncoder()
@@ -266,26 +244,30 @@ func calculateMaxTokens(prompt string, deploymentName string, userMaxTokens int)
 	return &remainingTokens, nil
 }
 
-func convertToOpenAIMessages(messages []Message) []azureOpenAI.ChatCompletionRequestMessage  {
-	openAIMessages := []azureOpenAI.ChatCompletionRequestMessage{}
-	
-	for _, message := range messages {
-		openAIMessage := azureOpenAI.ChatCompletionRequestMessage{
-			Role: message.role.String(),
-			Content: message.content,
-		}
-		openAIMessages = append(openAIMessages, openAIMessage)
-	}
-	
-	return openAIMessages
-}
-
-func initializeMessages() []Message {
-	messages := []Message{}
-	contextMessage := Message{
-		role: System,
-		content: baseContext,
+func initializeMessages() []models.Message {
+	messages := []models.Message{}
+	contextMessage := models.Message{
+		Role:    models.System,
+		Content: baseContext,
 	}
 	messages = append(messages, contextMessage)
-	return messages	
+
+	examplePromptMessage := models.Message{
+		Role:    models.User,
+		Content: examplePrompt,
+	}
+	messages = append(messages, examplePromptMessage)
+
+	exampleAnswerMessage := models.Message{
+		Role:    models.Assistant,
+		Content: exampleAnswer,
+	}
+	messages = append(messages, exampleAnswerMessage)
+
+	return messages
+}
+
+func initializePrompts() []string {
+	prompts := []string{baseContext}
+	return prompts
 }

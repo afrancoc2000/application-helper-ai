@@ -75,12 +75,12 @@ func (c *Command) run(args []string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
+	prompt := args[0]
 	var action, queryResult string
 	var err error
 	for action != apply {
 
-		args = append(args, action)
-		queryResult, err = c.client.QueryOpenAI(ctx, args, c.appConfig.OpenAIDeploymentName)
+		queryResult, err = c.client.QueryOpenAI(ctx, prompt)
 		if err != nil {
 			return err
 		}
@@ -98,6 +98,7 @@ func (c *Command) run(args []string) error {
 		if action == doNotApply {
 			return nil
 		}
+		prompt = action
 	}
 	return c.fileFactory.BuildProject(queryResult)
 }

@@ -1,4 +1,4 @@
-package openai
+package models
 
 type Role int
 

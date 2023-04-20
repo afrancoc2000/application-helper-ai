@@ -5,6 +5,8 @@ import (
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/afrancoc2000/application-helper-ai/internal/models"
 )
 
 const (
@@ -25,12 +27,6 @@ func NewFileFactory() fileFactory {
 	return fileFactory{}
 }
 
-type factoryFile struct {
-	name    string
-	path    string
-	content string
-}
-
 func (f *fileFactory) BuildProject(openAIResult string) error {
 
 	instructions := strings.Split(openAIResult, "\n")
@@ -46,11 +42,11 @@ func (f *fileFactory) BuildProject(openAIResult string) error {
 	return nil
 }
 
-func (f *fileFactory) generateFiles(instructions []string) []factoryFile {
-	files := []factoryFile{}
+func (f *fileFactory) generateFiles(instructions []string) []models.AppFile {
+	files := []models.AppFile{}
 	openContent := false
 
-	var currentFile factoryFile
+	var currentFile models.AppFile
 	for _, instruction := range instructions {
 
 		if strings.Contains(instruction, fileQuotesLabel) {
@@ -61,44 +57,44 @@ func (f *fileFactory) generateFiles(instructions []string) []factoryFile {
 			continue
 
 		} else if openContent {
-			currentFile.content = currentFile.content + "\n" + instruction
+			currentFile.Content = currentFile.Content + "\n" + instruction
 			continue
 
 		} else if strings.Contains(instruction, filePathLabel) {
 			re := regexp.MustCompile(filePathLabel + `\s+(\S+)`)
-			currentFile.path = re.FindStringSubmatch(instruction)[1]
+			currentFile.Path = re.FindStringSubmatch(instruction)[1]
 			continue
 
 		} else if strings.Contains(instruction, fileNameLabel) {
-			currentFile = factoryFile{}
+			currentFile = models.AppFile{}
 			re := regexp.MustCompile(fileNameLabel + `\s+(\S+)`)
-			currentFile.name = re.FindStringSubmatch(instruction)[1]
+			currentFile.Name = re.FindStringSubmatch(instruction)[1]
 			continue
 		}
 	}
 
 	fmt.Printf("Files: %v", len(files))
 	for _, file := range files {
-		fmt.Printf("{name: %s, path: %s, content: %v}\n", file.name, file.path, len(file.content))
+		fmt.Printf("{name: %s, path: %s, content: %v}\n", file.Name, file.Path, len(file.Content))
 	}
 
 	return files
 }
 
-func (f *fileFactory) saveFile(factoryFile factoryFile) error {
-	err := os.MkdirAll(factoryFile.path, os.ModePerm)
+func (f *fileFactory) saveFile(factoryFile models.AppFile) error {
+	err := os.MkdirAll(factoryFile.Path, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	file, err := os.Create(fmt.Sprintf("%s%s", factoryFile.path, factoryFile.name))
+	file, err := os.Create(fmt.Sprintf("%s%s", factoryFile.Path, factoryFile.Name))
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
 	defer file.Close()
 
-	_, err = file.WriteString(factoryFile.content)
+	_, err = file.WriteString(factoryFile.Content)
 	if err != nil {
 		fmt.Println(err)
 		return err

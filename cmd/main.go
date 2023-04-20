@@ -15,7 +15,7 @@ func main() {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
-	
+
 	command, err := cli.NewCommand(*appConfig)
 	if err != nil {
 		fmt.Println(err.Error())
