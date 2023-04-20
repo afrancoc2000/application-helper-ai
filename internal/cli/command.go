@@ -9,6 +9,7 @@ import (
 
 	"github.com/afrancoc2000/application-helper-ai/internal/config"
 	fileSystem "github.com/afrancoc2000/application-helper-ai/internal/file_system"
+	"github.com/afrancoc2000/application-helper-ai/internal/models"
 	"github.com/afrancoc2000/application-helper-ai/internal/openai"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
@@ -78,6 +79,7 @@ func (c *Command) run(args []string) error {
 	prompt := args[0]
 	var action, queryResult string
 	var err error
+	var files []models.AppFile
 	for action != apply {
 
 		queryResult, err = c.client.QueryOpenAI(ctx, prompt)
@@ -88,7 +90,12 @@ func (c *Command) run(args []string) error {
 		text := fmt.Sprintf(
 			"These are the files that would be created. Do you want to apply them? or add something to the query?\n%s",
 			queryResult)
-		fmt.Println(text)
+		files, err = models.AppFileFromString(text)
+		if err != nil {
+			return err
+		}
+
+		printQueryResults(files)
 
 		action, err = c.userActionPrompt()
 		if err != nil {
@@ -100,7 +107,7 @@ func (c *Command) run(args []string) error {
 		}
 		prompt = action
 	}
-	return c.fileFactory.BuildProject(queryResult)
+	return c.fileFactory.CreateFiles(files)
 }
 
 func (c *Command) userActionPrompt() (string, error) {
@@ -125,4 +132,12 @@ func (c *Command) userActionPrompt() (string, error) {
 	}
 
 	return result, nil
+}
+
+func printQueryResults(files []models.AppFile) {
+	for index, file := range files {
+		fmt.Printf("%d. File: %s/%s:\n", index, file.Path, file.Name)
+		fmt.Printf("%s\n", file.Content)
+		fmt.Printf("\n")
+	}
 }

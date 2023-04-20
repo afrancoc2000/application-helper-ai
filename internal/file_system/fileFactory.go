@@ -17,7 +17,7 @@ const (
 )
 
 type FileFactory interface {
-	BuildProject(openAIResult string) error
+	CreateFiles(openAIResult []models.AppFile) error
 }
 
 type fileFactory struct {
@@ -27,10 +27,10 @@ func NewFileFactory() fileFactory {
 	return fileFactory{}
 }
 
-func (f *fileFactory) BuildProject(openAIResult string) error {
+func (f *fileFactory) CreateFiles(files []models.AppFile) error {
 
-	instructions := strings.Split(openAIResult, "\n")
-	files := f.generateFiles(instructions)
+	// instructions := strings.Split(openAIResult, "\n")
+	// files := f.parseFiles(instructions)
 
 	for _, file := range files {
 		err := f.saveFile(file)
@@ -42,7 +42,7 @@ func (f *fileFactory) BuildProject(openAIResult string) error {
 	return nil
 }
 
-func (f *fileFactory) generateFiles(instructions []string) []models.AppFile {
+func (f *fileFactory) parseFiles(instructions []string) []models.AppFile {
 	files := []models.AppFile{}
 	openContent := false
 
