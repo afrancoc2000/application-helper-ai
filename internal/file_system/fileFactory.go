@@ -3,34 +3,22 @@ package cli
 import (
 	"fmt"
 	"os"
-	"regexp"
-	"strings"
 
 	"github.com/afrancoc2000/application-helper-ai/internal/models"
 )
 
-const (
-	fileNameLabel    = "File Name:"
-	filePathLabel    = "File Path:"
-	fileContentLabel = "File Content:"
-	fileQuotesLabel  = "```"
-)
-
 type FileFactory interface {
-	CreateFiles(openAIResult []models.AppFile) error
+	CreateFiles(files []models.AppFile) error
 }
 
 type fileFactory struct {
 }
 
-func NewFileFactory() fileFactory {
-	return fileFactory{}
+func NewFileFactory() FileFactory {
+	return &fileFactory{}
 }
 
 func (f *fileFactory) CreateFiles(files []models.AppFile) error {
-
-	// instructions := strings.Split(openAIResult, "\n")
-	// files := f.parseFiles(instructions)
 
 	for _, file := range files {
 		err := f.saveFile(file)
@@ -40,45 +28,6 @@ func (f *fileFactory) CreateFiles(files []models.AppFile) error {
 	}
 
 	return nil
-}
-
-func (f *fileFactory) parseFiles(instructions []string) []models.AppFile {
-	files := []models.AppFile{}
-	openContent := false
-
-	var currentFile models.AppFile
-	for _, instruction := range instructions {
-
-		if strings.Contains(instruction, fileQuotesLabel) {
-			openContent = !openContent
-			if !openContent {
-				files = append(files, currentFile)
-			}
-			continue
-
-		} else if openContent {
-			currentFile.Content = currentFile.Content + "\n" + instruction
-			continue
-
-		} else if strings.Contains(instruction, filePathLabel) {
-			re := regexp.MustCompile(filePathLabel + `\s+(\S+)`)
-			currentFile.Path = re.FindStringSubmatch(instruction)[1]
-			continue
-
-		} else if strings.Contains(instruction, fileNameLabel) {
-			currentFile = models.AppFile{}
-			re := regexp.MustCompile(fileNameLabel + `\s+(\S+)`)
-			currentFile.Name = re.FindStringSubmatch(instruction)[1]
-			continue
-		}
-	}
-
-	fmt.Printf("Files: %v", len(files))
-	for _, file := range files {
-		fmt.Printf("{name: %s, path: %s, content: %v}\n", file.Name, file.Path, len(file.Content))
-	}
-
-	return files
 }
 
 func (f *fileFactory) saveFile(factoryFile models.AppFile) error {

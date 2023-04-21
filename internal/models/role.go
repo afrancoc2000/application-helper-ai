@@ -9,11 +9,11 @@ const (
 )
 
 // String - Creating common behavior - give the type a String function
-func (w Role) String() string {
-	return [...]string{"system", "user", "assistant"}[w]
+func (r Role) String() string {
+	return [...]string{"system", "user", "assistant"}[r]
 }
 
 // EnumIndex - Creating common behavior - give the type a EnumIndex function
-func (w Role) EnumIndex() int {
-	return int(w)
+func (r Role) EnumIndex() int {
+	return int(r)
 }

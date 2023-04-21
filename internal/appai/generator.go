@@ -1,8 +1,7 @@
-package cli
+package appai
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -12,63 +11,30 @@ import (
 	"github.com/afrancoc2000/application-helper-ai/internal/models"
 	"github.com/afrancoc2000/application-helper-ai/internal/openai"
 	"github.com/manifoldco/promptui"
-	"github.com/spf13/cobra"
 )
 
 const (
-	version = "0.0.1"
-
 	apply      = "Apply"
 	doNotApply = "Don't apply"
 	makeBetter = "Add to the query"
 )
 
-type Command struct {
+type Generator struct {
+	appConfig   config.AppConfig
 	client      openai.AIClient
 	fileFactory fileSystem.FileFactory
-	appConfig   config.AppConfig
 }
 
-func NewCommand(appConfig config.AppConfig) (*Command, error) {
-	flag.Parse()
+func NewGenerator(appConfig config.AppConfig, client openai.AIClient, fileFactory fileSystem.FileFactory) (*Generator, error) {
 
-	client, err := openai.NewAIClient(appConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	fileFactory := fileSystem.NewFileFactory()
-
-	return &Command{
-		client:      client,
-		fileFactory: &fileFactory,
+	return &Generator{
 		appConfig:   appConfig,
+		client:      client,
+		fileFactory: fileFactory,
 	}, nil
 }
 
-func (c *Command) CreateCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:          "application-ai",
-		Version:      version,
-		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return fmt.Errorf("prompt must be provided")
-			}
-
-			err := c.run(args)
-			if err != nil {
-				return err
-			}
-
-			return nil
-		},
-	}
-
-	return cmd
-}
-
-func (c *Command) run(args []string) error {
+func (c *Generator) Run(args []string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
@@ -103,7 +69,7 @@ func (c *Command) run(args []string) error {
 	return c.fileFactory.CreateFiles(files)
 }
 
-func (c *Command) userActionPrompt() (string, error) {
+func (c *Generator) userActionPrompt() (string, error) {
 	// if skip confirmation is set, immediately return apply
 	if c.appConfig.SkipConfirmation {
 		return apply, nil
@@ -130,7 +96,7 @@ func (c *Command) userActionPrompt() (string, error) {
 func printQueryResults(files []models.AppFile) {
 	fmt.Println("These are the files that would be created. Do you want to apply them? or add something to the query?")
 	for index, file := range files {
-		fmt.Printf("%d. File: %s%s:\n", index, file.Path, file.Name)
+		fmt.Printf("%d. File: %s%s:\n", index + 1, file.Path, file.Name)
 		fmt.Printf("%s\n", file.Content)
 		fmt.Printf("\n")
 	}

@@ -22,17 +22,17 @@ const (
 	exampleAnswerName    = "main.tf"
 	exampleAnswerPath    = "./"
 	exampleAnswerContent = `
-	# Configure the Azure provider  
-	provider "azurerm" {  
-		features {}  
-	}  
-	  
-	# Create a resource group  
-	resource "azurerm_resource_group" "aks" {  
-		name     = var.resource_group_name  
-		location = var.resource_group_location  
-	}  		
-	`
+							# Configure the Azure provider  
+							provider "azurerm" {  
+								features {}  
+							}  
+								
+							# Create a resource group  
+							resource "azurerm_resource_group" "aks" {  
+								name     = var.resource_group_name  
+								location = var.resource_group_location  
+							}  		
+							`
 )
 
 type AIClient interface {
@@ -40,10 +40,10 @@ type AIClient interface {
 }
 
 func NewAIClient(appConfig config.AppConfig) (AIClient, error) {
-	isChat := isChat(appConfig.OpenAIDeployment)
-	isOpenAI := isOpenAI(appConfig.AzureOpenAIEndpoint)
+	isChat := isChat(appConfig.OpenaiDeployment)
+	isOpenAI := isOpenAI(appConfig.AzureOpenaiEndpoint)
 	if isOpenAI {
-		client := openAI.NewClient(appConfig.OpenAIAPIKey)
+		client := openAI.NewClient(appConfig.OpenaiApiKey)
 		if isChat {
 			messages := initializeMessages()
 			return &openAIChatClient{client: client, appConfig: appConfig, messages: messages}, nil
@@ -53,9 +53,9 @@ func NewAIClient(appConfig config.AppConfig) (AIClient, error) {
 		}
 	} else {
 		client, err := azureOpenAI.NewClient(
-			appConfig.AzureOpenAIEndpoint,
-			appConfig.OpenAIAPIKey,
-			appConfig.OpenAIDeployment.String(),
+			appConfig.AzureOpenaiEndpoint,
+			appConfig.OpenaiApiKey,
+			appConfig.OpenaiDeployment.String(),
 			azureOpenAI.WithTimeout(60*time.Second))
 		if err != nil {
 			return nil, err
@@ -104,7 +104,7 @@ type azureAIChatClient struct {
 }
 
 func calculateCompletionParams(prompts []string, appConfig config.AppConfig) (*int, error) {
-	return calculateMaxTokens(strings.Join(prompts, "\n"), appConfig.OpenAIDeployment, appConfig.MaxTokens)
+	return calculateMaxTokens(strings.Join(prompts, "\n"), appConfig.OpenaiDeployment, appConfig.MaxTokens)
 }
 
 func calculateChatParams(messages []models.Message, appConfig config.AppConfig) (*int, error) {
@@ -112,7 +112,7 @@ func calculateChatParams(messages []models.Message, appConfig config.AppConfig) 
 	if err != nil {
 		return nil, err
 	}
-	return calculateMaxTokens(string(prompts), appConfig.OpenAIDeployment, appConfig.MaxTokens)
+	return calculateMaxTokens(string(prompts), appConfig.OpenaiDeployment, appConfig.MaxTokens)
 }
 
 func (c *openAICompletionClient) QueryOpenAI(ctx context.Context, prompt string) (string, error) {
@@ -122,7 +122,7 @@ func (c *openAICompletionClient) QueryOpenAI(ctx context.Context, prompt string)
 		return "", err
 	}
 
-	resp, err := c.client.CompletionWithEngine(ctx, c.appConfig.OpenAIDeployment.String(), openAI.CompletionRequest{
+	resp, err := c.client.CompletionWithEngine(ctx, c.appConfig.OpenaiDeployment.String(), openAI.CompletionRequest{
 		Prompt:      c.prompts,
 		MaxTokens:   maxTokens,
 		Echo:        false,
@@ -152,7 +152,7 @@ func (c *openAIChatClient) QueryOpenAI(ctx context.Context, prompt string) (stri
 	}
 
 	resp, err := c.client.ChatCompletion(ctx, openAI.ChatCompletionRequest{
-		Model:       c.appConfig.OpenAIDeployment.String(),
+		Model:       c.appConfig.OpenaiDeployment.String(),
 		Messages:    models.ConvertToOpenAIMessages(c.messages),
 		MaxTokens:   *maxTokens,
 		N:           *&c.appConfig.Choices,
@@ -212,7 +212,7 @@ func (c *azureAIChatClient) QueryOpenAI(ctx context.Context, prompt string) (str
 	}
 
 	resp, err := c.client.ChatCompletion(ctx, azureOpenAI.ChatCompletionRequest{
-		Model:       c.appConfig.OpenAIDeployment.String(),
+		Model:       c.appConfig.OpenaiDeployment.String(),
 		Messages:    models.ConvertToAzureOpenAIMessages(c.messages),
 		MaxTokens:   *maxTokens,
 		N:           *&c.appConfig.Choices,
