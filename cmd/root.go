@@ -59,7 +59,6 @@ func init() {
 		"k",
 		"",
 		"The API key for the OpenAI service. This is required.")
-	RootCmd.MarkPersistentFlagRequired(config.OpenaiApiKeyLabel)
 
 	RootCmd.PersistentFlags().StringP(
 		config.OpenaiDeploymentNameLabel,
@@ -99,7 +98,15 @@ func init() {
 }
 
 func initConfig() {
-	viperConfig.AutomaticEnv()
+	viperConfig.SetEnvPrefix("")
+
+	viperConfig.BindEnv(config.OpenaiApiKeyLabel, "OPENAI_API_KEY")
+	viperConfig.BindEnv(config.OpenaiDeploymentNameLabel, "OPENAI_DEPLOYMENT_NAME")
+	viperConfig.BindEnv(config.MaxTokensLabel, "MAX_TOKENS")
+	viperConfig.BindEnv(config.AzureOpenaiEndpointLabel, "AZURE_OPENAI_ENDPOINT")
+	viperConfig.BindEnv(config.SkipConfirmationLabel, "SKIP_CONFIRMATION")
+	viperConfig.BindEnv(config.TemperatureLabel, "TEMPERATURE")
+	viperConfig.BindEnv(config.ChatContextLabel, "CHAT_CONTEXT")
 
 	viperConfig.BindPFlag(config.OpenaiApiKeyLabel, RootCmd.Flags().Lookup(config.OpenaiApiKeyLabel))
 	viperConfig.BindPFlag(config.OpenaiDeploymentNameLabel, RootCmd.Flags().Lookup(config.OpenaiDeploymentNameLabel))
