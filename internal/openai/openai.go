@@ -22,17 +22,17 @@ const (
 	exampleAnswerName    = "main.tf"
 	exampleAnswerPath    = "./"
 	exampleAnswerContent = `
-							# Configure the Azure provider  
-							provider "azurerm" {  
-								features {}  
-							}  
-								
-							# Create a resource group  
-							resource "azurerm_resource_group" "aks" {  
-								name     = var.resource_group_name  
-								location = var.resource_group_location  
-							}  		
-							`
+# Configure the Azure provider
+provider "azurerm" {
+	features {}
+}
+
+# Create a resource group
+resource "azurerm_resource_group" "aks" {
+	name     = var.resource_group_name
+	location = var.resource_group_location
+}
+`
 )
 
 type AIClient interface {
@@ -45,10 +45,10 @@ func NewAIClient(appConfig config.AppConfig) (AIClient, error) {
 	if isOpenAI {
 		client := openAI.NewClient(appConfig.OpenaiApiKey)
 		if isChat {
-			messages := initializeMessages()
+			messages := initializeMessages(appConfig)
 			return &openAIChatClient{client: client, appConfig: appConfig, messages: messages}, nil
 		} else {
-			prompts := initializePrompts()
+			prompts := initializePrompts(appConfig)
 			return &openAICompletionClient{client: client, appConfig: appConfig, prompts: prompts}, nil
 		}
 	} else {
@@ -62,10 +62,10 @@ func NewAIClient(appConfig config.AppConfig) (AIClient, error) {
 		}
 
 		if isChat {
-			messages := initializeMessages()
+			messages := initializeMessages(appConfig)
 			return &azureAIChatClient{client: client, appConfig: appConfig, messages: messages}, nil
 		} else {
-			prompts := initializePrompts()
+			prompts := initializePrompts(appConfig)
 			return &azureAICompletionClient{client: client, appConfig: appConfig, prompts: prompts}, nil
 		}
 	}
@@ -183,7 +183,7 @@ func (c *azureAICompletionClient) QueryOpenAI(ctx context.Context, prompt string
 	}
 
 	resp, err := c.client.Completion(ctx, azureOpenAI.CompletionRequest{
-		Prompt:      c.prompts,
+		Prompt:      []string{strings.Join(c.prompts, "\n")},
 		MaxTokens:   maxTokens,
 		Echo:        false,
 		N:           &c.appConfig.Choices,
@@ -251,11 +251,11 @@ func calculateMaxTokens(prompt string, deployment models.Deployment, userMaxToke
 	return &remainingTokens, nil
 }
 
-func initializeMessages() []models.Message {
+func initializeMessages(appConfig config.AppConfig) []models.Message {
 	messages := []models.Message{}
 	contextMessage := models.Message{
 		Role:    models.System,
-		Content: baseContext,
+		Content: fmt.Sprintf("%s\n%s", baseContext, appConfig.ChatContext),
 	}
 	messages = append(messages, contextMessage)
 
@@ -270,7 +270,7 @@ func initializeMessages() []models.Message {
 		Path:    exampleAnswerPath,
 		Content: exampleAnswerContent,
 	}
-	jsonContent, _ := json.Marshal(exampleAnswer)
+	jsonContent, _ := json.Marshal([]models.AppFile{exampleAnswer})
 
 	exampleAnswerMessage := models.Message{
 		Role:    models.Assistant,
@@ -281,7 +281,19 @@ func initializeMessages() []models.Message {
 	return messages
 }
 
-func initializePrompts() []string {
-	prompts := []string{baseContext}
-	return prompts
+func initializePrompts(appConfig config.AppConfig) []string {
+	exampleAnswer := models.AppFile{
+		Name:    exampleAnswerName,
+		Path:    exampleAnswerPath,
+		Content: exampleAnswerContent,
+	}
+	jsonContent, _ := json.Marshal([]models.AppFile{exampleAnswer})
+
+
+	return []string{
+		fmt.Sprintf(`An example answer for the question "%s" would be:`, examplePrompt),
+		string(jsonContent),
+		baseContext,
+		appConfig.ChatContext,
+	}
 }
