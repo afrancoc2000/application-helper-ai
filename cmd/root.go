@@ -100,20 +100,40 @@ func init() {
 func initConfig() {
 	viperConfig.SetEnvPrefix("")
 
-	viperConfig.BindEnv(config.OpenaiApiKeyLabel, "OPENAI_API_KEY")
-	viperConfig.BindEnv(config.OpenaiDeploymentNameLabel, "OPENAI_DEPLOYMENT_NAME")
-	viperConfig.BindEnv(config.MaxTokensLabel, "MAX_TOKENS")
-	viperConfig.BindEnv(config.AzureOpenaiEndpointLabel, "AZURE_OPENAI_ENDPOINT")
-	viperConfig.BindEnv(config.SkipConfirmationLabel, "SKIP_CONFIRMATION")
-	viperConfig.BindEnv(config.TemperatureLabel, "TEMPERATURE")
-	viperConfig.BindEnv(config.ChatContextLabel, "CHAT_CONTEXT")
+	err := viperConfig.BindEnv(config.OpenaiApiKeyLabel, "OPENAI_API_KEY")
+	logIfError(err)
+	err = viperConfig.BindEnv(config.OpenaiDeploymentNameLabel, "OPENAI_DEPLOYMENT_NAME")
+	logIfError(err)
+	err = viperConfig.BindEnv(config.MaxTokensLabel, "MAX_TOKENS")
+	logIfError(err)
+	err = viperConfig.BindEnv(config.AzureOpenaiEndpointLabel, "AZURE_OPENAI_ENDPOINT")
+	logIfError(err)
+	err = viperConfig.BindEnv(config.SkipConfirmationLabel, "SKIP_CONFIRMATION")
+	logIfError(err)
+	err = viperConfig.BindEnv(config.TemperatureLabel, "TEMPERATURE")
+	logIfError(err)
+	err = viperConfig.BindEnv(config.ChatContextLabel, "CHAT_CONTEXT")
+	logIfError(err)
 
-	viperConfig.BindPFlag(config.OpenaiApiKeyLabel, RootCmd.Flags().Lookup(config.OpenaiApiKeyLabel))
-	viperConfig.BindPFlag(config.OpenaiDeploymentNameLabel, RootCmd.Flags().Lookup(config.OpenaiDeploymentNameLabel))
-	viperConfig.BindPFlag(config.MaxTokensLabel, RootCmd.Flags().Lookup(config.MaxTokensLabel))
-	viperConfig.BindPFlag(config.AzureOpenaiEndpointLabel, RootCmd.Flags().Lookup(config.AzureOpenaiEndpointLabel))
-	viperConfig.BindPFlag(config.SkipConfirmationLabel, RootCmd.Flags().Lookup(config.SkipConfirmationLabel))
-	viperConfig.BindPFlag(config.TemperatureLabel, RootCmd.Flags().Lookup(config.TemperatureLabel))
-	viperConfig.BindPFlag(config.ChatContextLabel, RootCmd.Flags().Lookup(config.ChatContextLabel))
+	err = viperConfig.BindPFlag(config.OpenaiApiKeyLabel, RootCmd.Flags().Lookup(config.OpenaiApiKeyLabel))
+	logIfError(err)
+	err = viperConfig.BindPFlag(config.OpenaiDeploymentNameLabel, RootCmd.Flags().Lookup(config.OpenaiDeploymentNameLabel))
+	logIfError(err)
+	err = viperConfig.BindPFlag(config.MaxTokensLabel, RootCmd.Flags().Lookup(config.MaxTokensLabel))
+	logIfError(err)
+	err = viperConfig.BindPFlag(config.AzureOpenaiEndpointLabel, RootCmd.Flags().Lookup(config.AzureOpenaiEndpointLabel))
+	logIfError(err)
+	err = viperConfig.BindPFlag(config.SkipConfirmationLabel, RootCmd.Flags().Lookup(config.SkipConfirmationLabel))
+	logIfError(err)
+	err = viperConfig.BindPFlag(config.TemperatureLabel, RootCmd.Flags().Lookup(config.TemperatureLabel))
+	logIfError(err)
+	err = viperConfig.BindPFlag(config.ChatContextLabel, RootCmd.Flags().Lookup(config.ChatContextLabel))
+	logIfError(err)
 
+}
+
+func logIfError(err error) {
+	if err != nil {
+		fmt.Printf("There was an error binding to viper: %s\n", err.Error())
+	}
 }
