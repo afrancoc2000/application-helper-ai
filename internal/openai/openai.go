@@ -45,10 +45,10 @@ func NewAIClient(appConfig config.AppConfig) (AIClient, error) {
 	if isOpenAI {
 		client := openAI.NewClient(appConfig.OpenaiApiKey)
 		if isChat {
-			messages := initializeMessages(appConfig)
+			messages := initializeMessages(appConfig.ChatContext)
 			return &openAIChatClient{client: client, appConfig: appConfig, messages: messages}, nil
 		} else {
-			prompts := initializePrompts(appConfig)
+			prompts := initializePrompts(appConfig.ChatContext)
 			return &openAICompletionClient{client: client, appConfig: appConfig, prompts: prompts}, nil
 		}
 	} else {
@@ -62,10 +62,10 @@ func NewAIClient(appConfig config.AppConfig) (AIClient, error) {
 		}
 
 		if isChat {
-			messages := initializeMessages(appConfig)
+			messages := initializeMessages(appConfig.ChatContext)
 			return &azureAIChatClient{client: client, appConfig: appConfig, messages: messages}, nil
 		} else {
-			prompts := initializePrompts(appConfig)
+			prompts := initializePrompts(appConfig.ChatContext)
 			return &azureAICompletionClient{client: client, appConfig: appConfig, prompts: prompts}, nil
 		}
 	}
@@ -103,11 +103,11 @@ type azureAIChatClient struct {
 	messages  []models.Message
 }
 
-func calculateCompletionParams(prompts []string, appConfig config.AppConfig) (*int, error) {
+func calculateCompletionTokens(prompts []string, appConfig config.AppConfig) (*int, error) {
 	return calculateMaxTokens(strings.Join(prompts, "\n"), appConfig.OpenaiDeployment, appConfig.MaxTokens)
 }
 
-func calculateChatParams(messages []models.Message, appConfig config.AppConfig) (*int, error) {
+func calculateChatTokens(messages []models.Message, appConfig config.AppConfig) (*int, error) {
 	prompts, err := json.Marshal(messages)
 	if err != nil {
 		return nil, err
@@ -117,7 +117,7 @@ func calculateChatParams(messages []models.Message, appConfig config.AppConfig) 
 
 func (c *openAICompletionClient) QueryOpenAI(ctx context.Context, prompt string) (string, error) {
 	c.prompts = append(c.prompts, prompt)
-	maxTokens, err := calculateCompletionParams(c.prompts, c.appConfig)
+	maxTokens, err := calculateCompletionTokens(c.prompts, c.appConfig)
 	if err != nil {
 		return "", err
 	}
@@ -146,7 +146,7 @@ func (c *openAIChatClient) QueryOpenAI(ctx context.Context, prompt string) (stri
 		Content: prompt,
 	}
 	c.messages = append(c.messages, message)
-	maxTokens, err := calculateChatParams(c.messages, c.appConfig)
+	maxTokens, err := calculateChatTokens(c.messages, c.appConfig)
 	if err != nil {
 		return "", err
 	}
@@ -177,7 +177,7 @@ func (c *openAIChatClient) QueryOpenAI(ctx context.Context, prompt string) (stri
 
 func (c *azureAICompletionClient) QueryOpenAI(ctx context.Context, prompt string) (string, error) {
 	c.prompts = append(c.prompts, prompt)
-	maxTokens, err := calculateCompletionParams(c.prompts, c.appConfig)
+	maxTokens, err := calculateCompletionTokens(c.prompts, c.appConfig)
 	if err != nil {
 		return "", err
 	}
@@ -206,7 +206,7 @@ func (c *azureAIChatClient) QueryOpenAI(ctx context.Context, prompt string) (str
 		Content: prompt,
 	}
 	c.messages = append(c.messages, message)
-	maxTokens, err := calculateChatParams(c.messages, c.appConfig)
+	maxTokens, err := calculateChatTokens(c.messages, c.appConfig)
 	if err != nil {
 		return "", err
 	}
@@ -230,9 +230,12 @@ func (c *azureAIChatClient) QueryOpenAI(ctx context.Context, prompt string) (str
 }
 
 func calculateMaxTokens(prompt string, deployment models.Deployment, userMaxTokens int) (*int, error) {
-	maxTokens := userMaxTokens
-	if maxTokens == 0 {
-		maxTokens = deployment.MaxTokens()
+	deploymentMaxTokens := deployment.MaxTokens()
+	var maxTokens int
+	if userMaxTokens == 0 || userMaxTokens > deploymentMaxTokens {
+		maxTokens = deploymentMaxTokens
+	} else {
+		maxTokens = userMaxTokens
 	}
 
 	encoder, err := gptEncoder.NewEncoder()
@@ -251,11 +254,11 @@ func calculateMaxTokens(prompt string, deployment models.Deployment, userMaxToke
 	return &remainingTokens, nil
 }
 
-func initializeMessages(appConfig config.AppConfig) []models.Message {
+func initializeMessages(chatContext string) []models.Message {
 	messages := []models.Message{}
 	contextMessage := models.Message{
 		Role:    models.System,
-		Content: fmt.Sprintf("%s\n%s", baseContext, appConfig.ChatContext),
+		Content: fmt.Sprintf("%s\n%s", baseContext, chatContext),
 	}
 	messages = append(messages, contextMessage)
 
@@ -281,7 +284,7 @@ func initializeMessages(appConfig config.AppConfig) []models.Message {
 	return messages
 }
 
-func initializePrompts(appConfig config.AppConfig) []string {
+func initializePrompts(chatContext string) []string {
 	exampleAnswer := models.AppFile{
 		Name:    exampleAnswerName,
 		Path:    exampleAnswerPath,
@@ -289,11 +292,10 @@ func initializePrompts(appConfig config.AppConfig) []string {
 	}
 	jsonContent, _ := json.Marshal([]models.AppFile{exampleAnswer})
 
-
 	return []string{
+		baseContext,
+		chatContext,
 		fmt.Sprintf(`An example answer for the question "%s" would be:`, examplePrompt),
 		string(jsonContent),
-		baseContext,
-		appConfig.ChatContext,
 	}
 }

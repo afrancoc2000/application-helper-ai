@@ -96,7 +96,7 @@ func (c *Generator) userActionPrompt() (string, error) {
 func printQueryResults(files []models.AppFile) {
 	fmt.Println("These are the files that would be created. Do you want to apply them? or add something to the query?")
 	for index, file := range files {
-		fmt.Printf("%d. File: %s%s:\n", index + 1, file.Path, file.Name)
+		fmt.Printf("%d. File: %s%s:\n", index+1, file.Path, file.Name)
 		fmt.Printf("%s\n", file.Content)
 		fmt.Printf("\n")
 	}

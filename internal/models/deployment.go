@@ -26,10 +26,6 @@ func (d Deployment) String() string {
 	}[d]
 }
 
-func (w Deployment) EnumIndex() int {
-	return int(w)
-}
-
 func (d Deployment) MaxTokens() int {
 	return [...]int{
 		8001, // code-davinci-002
@@ -73,14 +69,4 @@ func DeploymentFromName(name string) (Deployment, error) {
 	}
 
 	return -1, fmt.Errorf("The specified deployment does not exist, please choose one of these options: code-davinci-002, text-davinci-003, gpt-3.5-turbo-0301, gpt-3.5-turbo, gpt-35-turbo-0301, gpt-4-0314, gpt-4-32k-0314")
-}
-
-func (d *Deployment) Decode(value string) error {
-	deployment, err := DeploymentFromName(value)
-	if err != nil {
-		return err
-	}
-
-	*d = Deployment(deployment)
-	return nil
 }
