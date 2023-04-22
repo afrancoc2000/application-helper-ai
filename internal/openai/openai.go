@@ -155,7 +155,7 @@ func (c *openAIChatClient) QueryOpenAI(ctx context.Context, prompt string) (stri
 		Model:       c.appConfig.OpenaiDeployment.String(),
 		Messages:    models.ConvertToOpenAIMessages(c.messages),
 		MaxTokens:   *maxTokens,
-		N:           *&c.appConfig.Choices,
+		N:           c.appConfig.Choices,
 		Temperature: &c.appConfig.Temperature,
 	})
 	if err != nil {
@@ -215,7 +215,7 @@ func (c *azureAIChatClient) QueryOpenAI(ctx context.Context, prompt string) (str
 		Model:       c.appConfig.OpenaiDeployment.String(),
 		Messages:    models.ConvertToAzureOpenAIMessages(c.messages),
 		MaxTokens:   *maxTokens,
-		N:           *&c.appConfig.Choices,
+		N:           c.appConfig.Choices,
 		Temperature: &c.appConfig.Temperature,
 	})
 	if err != nil {
