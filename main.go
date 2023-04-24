@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/afrancoc2000/application-helper-ai/cmd"
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 func main() {
