@@ -6,7 +6,7 @@ require (
 	github.com/PullRequestInc/go-gpt3 v1.1.15
 	github.com/manifoldco/promptui v0.9.0
 	github.com/samber/go-gpt-3-encoder v0.3.1
-	github.com/smartystreets/goconvey v1.8.0
+	github.com/smartystreets/goconvey v1.8.1
 	github.com/sozercan/kubectl-ai v0.0.9
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.15.0
@@ -20,7 +20,6 @@ require (
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
-	github.com/smartystreets/assertions v1.13.1 // indirect
 	github.com/spf13/afero v1.9.3 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
@@ -33,6 +32,7 @@ require (
 	github.com/dlclark/regexp2 v1.8.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/samber/lo v1.37.0 // indirect
+	github.com/smarty/assertions v1.15.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
 	golang.org/x/sys v0.7.0 // indirect
